@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>追聖誕老公公之旅 - 雲端同步版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #FAF8FB;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Firebase Imports (CDN version)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Firebase Config
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'finland-trip-html-v1';
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [activeTab, setActiveTab] = useState('checklist');
+            const [selectedDay, setSelectedDay] = useState(0);
+            const [checklist, setChecklist] = useState([]);
+            const [expenses, setExpenses] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [eurAmount, setEurAmount] = useState('');
+            const [twdAmount, setTwdAmount] = useState('');
+
+            const exchangeRate = 35;
+            const members = ['仙姑', '欣倫', '貞霓', '羽喬'];
+            const colors = { primary: '#B1A2C7', secondary: '#D6A5A5', accent: '#E5E0EB' };
+
+            const [newExpense, setNewExpense] = useState({ desc: '', amount: '', payer: '仙姑', splitWith: [...members] });
+
+            // 1. Auth 初始化
+            useEffect(() => {
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    if (!u) {
+                        signInAnonymously(auth);
+                    } else {
+                        setUser(u);
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // 2. 數據同步
+            useEffect(() => {
+                if (!user) return;
+
+                const checklistRef = collection(db, 'artifacts', appId, 'public', 'data', 'checklist');
+                const expensesRef = collection(db, 'artifacts', appId, 'public', 'data', 'expenses');
+
+                const unsubCheck = onSnapshot(checklistRef, (snap) => {
+                    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    if (items.length === 0) seedChecklist();
+                    else setChecklist(items.sort((a, b) => (a.catIdx || 0) - (b.catIdx || 0)));
+                    setLoading(false);
+                });
+
+                const unsubExp = onSnapshot(expensesRef, (snap) => {
+                    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setExpenses(items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+                });
+
+                return () => { unsubCheck(); unsubExp(); };
+            }, [user]);
+
+            const seedChecklist = async () => {
+                const base = [
+                    { cat: '重要證件', text: '護照正本 + 影本 + 所有人手機掃描存檔', checked: false, catIdx: 1 },
+                    { cat: '重要證件', text: '所有確認單紙本 (機票/火車/破冰船/飯店)', checked: false, catIdx: 1 },
+                    { cat: '極地衣著', text: '發熱衣建議兩層 (羊毛材質佳)', checked: true, catIdx: 2 },
+                    { cat: '極地衣著', text: 'Gore-Tex 防水保暖外套 (長版佳)', checked: false, catIdx: 2 },
+                    { cat: '極地衣著', text: '防滑防水雪靴 (刻痕要深) + 羊毛厚襪', checked: false, catIdx: 2 },
+                    { cat: '老人小孩專屬', text: '冰面防滑鞋爪 (Crampons) - 必帶防止跌倒', checked: false, catIdx: 3 },
+                    { cat: '老人小孩專屬', text: '全家常備藥: 退燒糖漿/感冒/止瀉/高山藥', checked: false, catIdx: 3 },
+                    { cat: '老人小孩專屬', text: '長輩關節保暖護膝 + 溫熱貼布', checked: false, catIdx: 3 },
+                    { cat: '老人小孩專屬', text: '小孩換穿乾衣物 + 輕量保溫瓶', checked: false, catIdx: 3 },
+                    { cat: '裝備備品', text: '歐標轉接頭 (Type C/E/F) + 延長線', checked: false, catIdx: 4 },
+                    { cat: '裝備備品', text: '高容量行動電源 (低溫掉電快)', checked: false, catIdx: 4 },
+                    { cat: '日常保養', text: '強效保濕乳液 / 護唇膏 (極度乾燥)', checked: false, catIdx: 5 },
+                ];
+                for (const item of base) {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'checklist'), { ...item, createdAt: serverTimestamp() });
+                }
+            };
+
+            const toggleCheck = async (item) => {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'checklist', item.id), { checked: !item.checked });
+            };
+
+            const handleAddExp = async () => {
+                if (!newExpense.desc || !newExpense.amount) return;
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), { ...newExpense, amount: parseFloat(newExpense.amount), createdAt: serverTimestamp() });
+                setNewExpense({ desc: '', amount: '', payer: '仙姑', splitWith: [...members] });
+            };
+
+            const deleteExp = async (id) => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', id)); };
+
+            const calcBalances = useMemo(() => {
+                const bal = {}; members.forEach(m => bal[m] = 0);
+                expenses.forEach(e => {
+                    const share = e.amount / e.splitWith.length;
+                    bal[e.payer] += e.amount;
+                    e.splitWith.forEach(m => bal[m] -= share);
+                });
+                return bal;
+            }, [expenses]);
+
+            const passengersMain = [{ name: '貞霓 (YU CHENNI)', pnr: 'E748Q2' }, { name: '仙姑 (CHANG HUICHIN)', pnr: 'E748Q2' }, { name: '羽喬 (TANG UKIO)', pnr: 'EYKWRZ' }, { name: '欣倫 (YU XINLUN)', pnr: '9I256Q' }];
+
+            const itineraryData = [
+                { date: '12/20', weekday: 'SUN', title: '旅程啟航', items: [{ time: '17:00', type: 'transport', content: '百路達包車 (Toyota Alphard)', detail: '出發前往香港機場', image: 'https://images.unsplash.com/photo-1590362891991-f776e747a588?auto=format&fit=crop&q=80&w=600' }, { time: '21:45', type: 'flight', content: 'AY100 芬蘭航空', detail: 'HKG ✈ HEL', passengers: passengersMain }], accommodation: { name: '機上過夜' } },
+                { date: '12/21', weekday: 'MON', title: '赫爾辛基市區', items: [{ time: '05:45', type: 'transport', content: '機場接機到火車站', detail: 'Trip.com $2800' }, { time: '10:00', type: 'activity', content: '赫爾辛基主座教堂', address: 'Unioninkatu 29, 00170 Helsinki' }, { time: '11:00', type: 'activity', content: '參議院廣場耶誕市集' }, { time: '12:30', type: 'food', content: 'Kappeli 嘉蓓麗餐廳', detail: '推薦：鮭魚湯', image: 'https://images.unsplash.com/photo-1517400508447-f8dd518b86db?auto=format&fit=crop&q=80&w=600' }, { time: '16:00', type: 'activity', content: '芬蘭堡 Suomenlinna' }], accommodation: { name: 'VR 聖誕老人特快車' } },
+                { date: '12/22', weekday: 'TUE', title: '羅瓦涅米：探險開始', items: [{ time: '07:20', type: 'activity', content: '抵達 Rovaniemi & 麥當勞打卡' }, { time: 'AM', type: 'activity', content: 'Ranua Zoo 野生動物園', detail: '18900 TWD' }], accommodation: { name: '羅瓦涅米民宿：BEARHEART' } },
+                { date: '12/23', weekday: 'WED', title: '夢幻聖誕村', items: [{ time: 'Morning', type: 'activity', content: '聖誕老人村、郵局、打卡' }, { time: 'Lunch', type: 'food', content: 'Santa’s Salmon Place', detail: '炭烤鮭魚' }], accommodation: { name: '羅瓦涅米民宿：BEARHEART' } },
+                { date: '12/24', weekday: 'THU', title: '平安夜：破冰船', items: [{ time: 'Day', type: 'activity', content: '瑞典 POLAR 破冰船', detail: '$63324' }], accommodation: { name: '羅瓦涅米民宿：BEARHEART' } },
+                { date: '12/25', weekday: 'FRI', title: '移動薩里賽爾卡', items: [{ time: 'Morning', type: 'activity', content: '哈士奇雪橇' }], accommodation: { name: 'Northern Lights Village' } },
+                { date: '12/26', weekday: 'SAT', title: '冰釣與重返', items: [{ time: '10:00', type: 'activity', content: 'Snowmobile & Ice Fishing' }, { time: '18:35', type: 'flight', content: 'AY606 返回赫爾辛基' }], accommodation: { name: 'Scandic Simonkenttä 飯店' } },
+                { date: '12/27', weekday: 'SUN', title: '最後採買與返程', items: [{ time: 'Lunch', type: 'food', content: 'Haru sushi plus' }, { time: 'PM', type: 'activity', content: 'Stockmann 百貨' }], accommodation: { name: '機上過夜' } },
+                { date: '12/28', weekday: 'MON', title: '抵港：包車回澳門', items: [{ time: '14:30', type: 'activity', content: '抵達香港國際機場' }, { time: '16:00', type: 'transport', content: '百路達包車 (Toyota Alphard)', detail: '包車返回澳門住所', image: 'https://images.unsplash.com/photo-1590362891991-f776e747a588?auto=format&fit=crop&q=80&w=600' }], accommodation: { name: '溫暖的家' } }
+            ];
+
+            if (loading) return <div className="h-screen flex items-center justify-center text-[#B1A2C7] font-black italic">Santa is checking his list...</div>;
+
+            return (
+                <div className="max-w-md mx-auto">
+                    {/* Header: 手繪彩繪風聖誕老人 (SVG) */}
+                    <header className="relative w-full h-44 flex flex-col items-center justify-center overflow-hidden bg-[#2D3E50]">
+                        <div className="absolute inset-0">
+                            <svg className="absolute w-full h-full" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice">
+                                <circle cx="330" cy="50" r="45" fill="#FDFD96" opacity="0.3" />
+                                <circle cx="330" cy="50" r="38" fill="#FDFD96" opacity="0.2" />
+                                <g transform="translate(80, 45) scale(0.65)" opacity="0.95">
+                                    <g transform="translate(140, 5)">
+                                        <path d="M0,15 L25,10 L15,30 L0,15" fill="#C7B198" opacity="0.6" />
+                                        <path d="M0,15 L25,10 L15,30 L0,15" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                                    </g>
+                                    <g transform="translate(0, 0)">
+                                        <path d="M0,35 L55,35 Q65,35 65,25 L65,10 Q65,0 55,0 L0,0 Q-10,0 -10,10 L-10,25 Q-10,35 0,35" fill="#E07A5F" opacity="0.5" />
+                                        <path d="M0,35 L55,35 Q65,35 65,25 L65,10 Q65,0 55,0 L0,0 Q-10,0 -10,10 L-10,25 Q-10,35 0,35" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+                                        <path d="M22,-15 L30,-35 L38,-15 Z" fill="#D6A5A5" />
+                                        <circle cx="30" cy="-35" r="4" fill="white" />
+                                        <path d="M20,0 Q30,-20 40,0" fill="white" opacity="0.7" />
+                                    </g>
+                                    <path d="M65,25 Q100,25 140,20" fill="none" stroke="white" strokeWidth="1.2" strokeDasharray="5,4" />
+                                </g>
+                                <g opacity="0.5">
+                                    <path d="M20,200 L50,140 L80,200 Z" fill="#8E9775" opacity="0.4" />
+                                    <path d="M20,200 L50,140 L80,200 Z" fill="none" stroke="white" strokeWidth="1" />
+                                    <rect x="280" y="170" width="40" height="30" fill="#C7B198" opacity="0.4" />
+                                </g>
+                                {[...Array(12)].map((_, i) => (
+                                    <circle key={i} cx={Math.random() * 400} cy={Math.random() * 200} r={1.5} fill="white" opacity="0.6">
+                                        <animate attributeName="cy" from="-10" to="210" dur={`${Math.random() * 5 + 5}s`} repeatCount="indefinite" />
+                                    </circle>
+                                ))}
+                            </svg>
+                        </div>
+                        <div className="z-10 text-center px-4 mt-2">
+                            <h1 className="text-white text-2xl font-black italic tracking-tighter drop-shadow-lg">追聖誕老公公之旅</h1>
+                            <div className="flex justify-center items-center gap-2 mt-2">
+                                <span className="bg-white/20 text-white text-[8px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <i data-lucide="wifi" style={{width: 8, height: 8}}></i> 雲端同步中
+                                </span>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Navbar */}
+                    <nav className="sticky top-0 z-40 bg-white/70 backdrop-blur-md flex justify-around p-4 shadow-sm border-b border-white/50">
+                        <button onClick={() => setActiveTab('checklist')} className={`flex flex-col items-center transition-all ${activeTab === 'checklist' ? 'opacity-100 scale-110 font-black' : 'opacity-25'}`}>
+                            <i data-lucide="briefcase" style={{color: activeTab === 'checklist' ? colors.primary : '#555'}}></i>
+                            <span className="text-[9px]">行前清單</span>
+                        </button>
+                        <button onClick={() => setActiveTab('itinerary')} className={`flex flex-col items-center transition-all ${activeTab === 'itinerary' ? 'opacity-100 scale-110 font-black' : 'opacity-25'}`}>
+                            <i data-lucide="calendar" style={{color: activeTab === 'itinerary' ? colors.primary : '#555'}}></i>
+                            <span className="text-[9px]">每日行程</span>
+                        </button>
+                        <button onClick={() => setActiveTab('calc')} className={`flex flex-col items-center transition-all ${activeTab === 'calc' ? 'opacity-100 scale-110 font-black' : 'opacity-25'}`}>
+                            <i data-lucide="refresh-cw" style={{color: activeTab === 'calc' ? colors.primary : '#555'}}></i>
+                            <span className="text-[9px]">匯率換算</span>
+                        </button>
+                        <button onClick={() => setActiveTab('expenses')} className={`flex flex-col items-center transition-all ${activeTab === 'expenses' ? 'opacity-100 scale-110 font-black' : 'opacity-25'}`}>
+                            <i data-lucide="wallet" style={{color: activeTab === 'expenses' ? colors.primary : '#555'}}></i>
+                            <span className="text-[9px]">多人記帳</span>
+                        </button>
+                    </nav>
+
+                    {/* Main Content */}
+                    <main className="p-6">
+                        {activeTab === 'checklist' && (
+                            <div className="animate-fadeIn space-y-6">
+                                <div className="bg-white p-5 rounded-3xl border border-indigo-50 flex items-start gap-4 shadow-sm">
+                                    <i data-lucide="alert-circle" className="text-[#D6A5A5]"></i>
+                                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed">這是即時同步清單，大家可以隨時在手機上勾選！</p>
+                                </div>
+                                {['重要證件', '極地衣著', '老人小孩專屬', '裝備與藥物', '日常保養'].map(cat => (
+                                    <div key={cat} className="space-y-3">
+                                        <p className="text-[10px] font-black opacity-40 uppercase tracking-widest pl-2">{cat}</p>
+                                        {checklist.filter(i => i.cat === cat).map(item => (
+                                            <div key={item.id} onClick={() => toggleCheck(item)} className="bg-white p-5 rounded-[28px] flex items-center gap-4 cursor-pointer hover:bg-slate-50 transition-all border border-slate-50 shadow-sm">
+                                                {item.checked ? <i data-lucide="check-circle-2" className="text-[#B1A2C7]"></i> : <i data-lucide="circle" className="text-slate-200"></i>}
+                                                <span className={`text-sm font-medium ${item.checked ? 'line-through text-slate-300 italic' : ''}`}>{item.text}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {activeTab === 'itinerary' && (
+                            <div className="animate-fadeIn">
+                                <div className="flex gap-3 overflow-x-auto pb-6 no-scrollbar">
+                                    {itineraryData.map((day, idx) => (
+                                        <button key={idx} onClick={() => setSelectedDay(idx)} className={`flex-shrink-0 w-14 py-3 rounded-2xl flex flex-col items-center transition-all ${selectedDay === idx ? 'bg-[#B1A2C7] text-white shadow-lg' : 'bg-white shadow-sm'}`}>
+                                            <span className="text-[8px] font-bold opacity-50">{day.weekday}</span>
+                                            <span className="text-base font-black">{day.date.split('/')[1]}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                <h2 className="text-xl font-black text-slate-700 mb-6 border-b border-slate-100 pb-2">{itineraryData[selectedDay].title}</h2>
+                                <div className="space-y-6">
+                                    {itineraryData[selectedDay].items.map((item, iIdx) => (
+                                        <div key={iIdx} className="bg-white p-6 rounded-[35px] border border-slate-50 shadow-sm relative">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="bg-[#E5E0EB] text-[9px] font-black px-2.5 py-1 rounded-full">{item.time}</span>
+                                                {item.type === 'food' ? <i data-lucide="utensils" style={{width:16, height:16}} className="text-[#D6A5A5]"></i> : <i data-lucide="star" style={{width:16, height:16}} className="text-[#B1A2C7]"></i>}
+                                            </div>
+                                            <h4 className="text-base font-bold text-slate-700">{item.content}</h4>
+                                            {item.detail && <p className="text-xs text-slate-400 mt-2">{item.detail}</p>}
+                                            {item.image && <img src={item.image} className="w-full h-44 object-cover rounded-3xl mt-4" />}
+                                            {item.address && (
+                                                <div className="mt-4 p-4 rounded-3xl bg-[#FAF8FB] border border-slate-50 flex justify-between items-center">
+                                                    <div className="flex gap-2 items-center">
+                                                        <i data-lucide="map-pin" style={{width:14}} className="text-[#D6A5A5]"></i>
+                                                        <p className="text-[10px] font-bold text-slate-400">{item.address.slice(0, 20)}...</p>
+                                                    </div>
+                                                    <button onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`, '_blank')} className="p-2 bg-white rounded-xl shadow-sm"><i data-lucide="navigation" style={{width:14}} className="text-[#B1A2C7]"></i></button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <div className="mt-10 p-6 bg-[#FAF8FB] rounded-[40px] border border-slate-100 shadow-inner">
+                                        <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.3em] mb-3 flex items-center gap-2"><i data-lucide="home" style={{width:14}}></i> 今日下榻住宿</p>
+                                        <h3 className="text-base font-black text-slate-700">{itineraryData[selectedDay].accommodation.name}</h3>
+                                        <p className="text-xs text-slate-400 font-medium italic">{itineraryData[selectedDay].accommodation.detail}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'calc' && (
+                            <div className="animate-fadeIn space-y-8">
+                                <h2 className="text-xl font-black text-[#B1A2C7] text-center">💱 匯率換算</h2>
+                                <div className="bg-white p-10 rounded-[50px] shadow-sm space-y-8 border border-slate-50">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black opacity-30 px-2 tracking-widest uppercase">EUR 歐元</label>
+                                        <input type="number" value={eurAmount} onChange={(e)=>{setEurAmount(e.target.value); setTwdAmount(e.target.value ? (parseFloat(e.target.value)*exchangeRate).toFixed(0) : '');}} placeholder="0.00" className="w-full p-6 bg-[#FAF8FB] rounded-2xl text-2xl font-black outline-none border-none shadow-inner" />
+                                    </div>
+                                    <div className="flex justify-center"><i data-lucide="refresh-cw" className="text-slate-100 rotate-90"></i></div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black opacity-30 px-2 tracking-widest uppercase">TWD 台幣</label>
+                                        <input type="number" value={twdAmount} onChange={(e)=>{setTwdAmount(e.target.value); setEurAmount(e.target.value ? (parseFloat(e.target.value)/exchangeRate).toFixed(2) : '');}} placeholder="0" className="w-full p-6 bg-[#FAF8FB] rounded-2xl text-2xl font-black outline-none border-none shadow-inner" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'expenses' && (
+                            <div className="animate-fadeIn space-y-8">
+                                <div className="grid grid-cols-2 gap-4">
+                                    {members.map(name => (
+                                        <div key={name} className="bg-white p-5 rounded-[30px] text-center border border-slate-50 shadow-sm">
+                                            <p className="text-[10px] font-black opacity-30 uppercase tracking-widest">{name}</p>
+                                            <p className={`text-xl font-black mt-2 ${calcBalances[name] >= 0 ? 'text-green-400' : 'text-[#D6A5A5]'}`}>${Math.round(calcBalances[name])}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-white p-8 rounded-[45px] shadow-lg space-y-6">
+                                    <h3 className="text-sm font-black flex items-center gap-3 italic text-slate-700">記下一筆開支</h3>
+                                    <input type="text" placeholder="支出項目內容" className="w-full p-4 bg-[#FAF8FB] rounded-2xl text-sm font-bold outline-none" value={newExpense.desc} onChange={e=>setNewExpense({...newExpense, desc: e.target.value})} />
+                                    <div className="flex gap-3">
+                                        <input type="number" placeholder="金額" className="flex-1 p-4 bg-[#FAF8FB] rounded-2xl text-sm font-black outline-none" value={newExpense.amount} onChange={e=>setNewExpense({...newExpense, amount: e.target.value})} />
+                                        <select className="p-4 bg-[#FAF8FB] rounded-2xl text-[10px] font-bold outline-none" value={newExpense.payer} onChange={e=>setNewExpense({...newExpense, payer: e.target.value})}>
+                                            {members.map(m => <option key={m} value={m}>{m} 付款</option>)}
+                                        </select>
+                                    </div>
+                                    <button onClick={handleAddExp} className="w-full bg-[#B1A2C7] text-white py-5 rounded-[30px] font-black shadow-lg uppercase text-xs">同步到雲端</button>
+                                </div>
+                                <div className="space-y-3 pb-8">
+                                    {expenses.map(exp => (
+                                        <div key={exp.id} className="bg-white p-5 rounded-[25px] border border-slate-50 flex justify-between items-center shadow-sm">
+                                            <div><p className="text-sm font-bold text-slate-600">{exp.desc}</p><p className="text-[9px] font-bold opacity-30">由 {exp.payer} 支付</p></div>
+                                            <div className="flex items-center gap-4">
+                                                <p className="text-sm font-black text-slate-800">${exp.amount}</p>
+                                                <button onClick={() => deleteExp(exp.id)} className="text-slate-200 hover:text-rose-400"><i data-lucide="trash-2" style={{width: 16}}></i></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Footer / Nav Icons rendering */}
+                    {useEffect(() => { lucide.createIcons(); })}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
