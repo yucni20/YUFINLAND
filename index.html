@@ -1,263 +1,551 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>追聖誕老公公之旅 🎅</title>
-    <!-- 載入 Tailwind CSS (樣式框架) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 載入 React 核心庫 -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- 載入 Babel (將 JSX 轉換為瀏覽器認得的 JS) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background-color: #F7F4EB;
-            color: #4A4543;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
+```react
+import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, collection, doc, onSnapshot, addDoc, deleteDoc, query, orderBy 
+} from 'firebase/firestore';
+import { 
+  getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken 
+} from 'firebase/auth';
 
-    <!-- 載入 Firebase 模組 (CDN 版本) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, onSnapshot, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-        // 注意：這些變數是由本平台動態注入的。
-        // 如果要在外部自行部署，請手動替換為您的 Firebase 配置物件。
-        const firebaseConfig = {
-  apiKey: "AIzaSyDMvp2DkeGq8pFPVyHaE8O5rjDjImMm52o",
-  authDomain: "fairymoney-6357f.firebaseapp.com",
-  projectId: "fairymoney-6357f",
-  storageBucket: "fairymoney-6357f.firebasestorage.app",
-  messagingSenderId: "724748246687",
-  appId: "1:724748246687:web:a67c6dca3acc232505ccaa"
+// --- Firebase 配置 ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDMvp2DkeGq8pFPVyHaE8O5rjDjImMm52o",
+  authDomain: "fairymoney-6357f.firebaseapp.com",
+  projectId: "fairymoney-6357f",
+  storageBucket: "fairymoney-6357f.firebasestorage.app",
+  messagingSenderId: "724748246687",
+  appId: "1:724748246687:web:a67c6dca3acc232505ccaa"
 };
-        const appId = window.__app_id || 'santa-trip-2026';
 
-        // 初始化 Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'santa-trip-2026-ultimate';
 
-        // 將 Firebase 工具掛載到 window，讓 Babel 內的 React 可以使用
-        window.fb = { db, auth, appId, collection, doc, onSnapshot, addDoc, deleteDoc, signInAnonymously, onAuthStateChanged };
-    </script>
+// --- 核心配置 ---
+const MEMBERS = ["仙姑", "欣倫", "貞霓", "羽喬"];
+const EXCHANGE_RATE = 35.5; 
+const GEMINI_API_KEY = ""; // 執行環境會自動注入
 
-    <!-- React 應用程式代碼 -->
-    <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+// --- 圖標組件 (SVG) ---
+const Icons = {
+  Schedule: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
+  Luggage: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"></rect><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"></path></svg>,
+  Shopping: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path></svg>,
+  Translate: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 8 6 6"></path><path d="m4 14 6-6 2-3"></path><path d="M2 5h12"></path></svg>,
+  Wallet: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"></path></svg>,
+  Map: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>,
+  Check: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><polyline points="20 6 9 17 4 12"></polyline></svg>,
+  Trash: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path></svg>,
+  CreditCard: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>,
+  Banknote: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle></svg>,
+};
 
-        const COLORS = {
-            bg: '#F7F4EB', primary: '#9A8B9B', secondary: '#A8A196', accent: '#E0E5D5', text: '#4A4543', danger: '#D98E8E', success: '#8EB695'
-        };
+// --- 行程資料 ---
+const TRIP_DATA = [
+  { date: '12/20', city: '香港 ➔ 赫爾辛基', temp: '1°/-2°', weather: '☁️', events: [
+    { time: '17:00', title: '百路達包車', note: '出發前往香港機場', isKey: true, mapUrl: 'https://www.google.com/maps/search/Hong+Kong+International+Airport' },
+    { time: '21:45', title: 'AY100 啟程', note: 'HKG ✈ HEL (14hr)\nPNR: E748Q2 / EYKWRZ / 9I256Q', isKey: true }
+  ]},
+  { date: '12/21', city: '赫爾辛基', temp: '0°/-3°', weather: '❄️', events: [
+    { time: '05:45', title: '抵達萬塔機場', note: 'Trip.com 接機 ($2800) ➔ 火車站', mapUrl: 'https://www.google.com/maps/search/Helsinki+Airport' },
+    { time: '上午', title: '火車站寄存行李', note: '寄存櫃定位', mapUrl: 'https://www.google.com/maps/search/Helsinki+Central+Station+Luggage+Storage' },
+    { time: '景點', title: '主座教堂 & 參議院廣場', note: '耶誕市集打卡', mapUrl: 'https://www.google.com/maps/place/Helsinki+Cathedral' },
+    { time: '景點', title: '老農貿市場 & 芬蘭堡', note: 'OLD MARKET HALL', mapUrl: 'https://www.google.com/maps/place/Old+Market+Hall' },
+    { time: '美食', title: 'Kappeli 鮭魚湯', note: '早餐: Friends & Brgrs / 午餐: Kappeli', isFood: true, mapUrl: 'https://www.google.com/maps/place/Kappeli' },
+    { time: '購物', title: 'MOOMIN SHOP', note: '嚕嚕米周邊', mapUrl: 'https://www.google.com/maps/search/MOOMIN+SHOP+Helsinki' },
+    { time: '19:29', title: 'VR 北極特快車', note: '夜宿火車 (19:29-07:20)', isKey: true }
+  ]},
+  { date: '12/22', city: '羅瓦涅米', temp: '-10°/-15°', weather: '❄️', events: [
+    { time: '07:20', title: '打卡聖誕麥當勞', note: '領取最北證書', mapUrl: 'https://www.google.com/maps/place/McDonald\'s+Rovaniemi' },
+    { time: '早上', title: '北極野生動物園', note: '€514 ($18900) 2大1小', mapUrl: 'https://www.google.com/maps/place/Ranua+Zoo' },
+    { time: '下午', title: 'K-Market 超市', note: '採買物資', mapUrl: 'https://www.google.com/maps/search/K-Market+Rovaniemi' },
+    { time: '晚上', title: '追極光行程', note: '€580 (宿: BEARHEART)', isKey: true }
+  ]},
+  { date: '12/23', city: '羅瓦涅米', temp: '-12°/-18°', weather: '🌫️', events: [
+    { time: '上午', title: '聖誕老人村', note: '辦公室、郵局、北極圈打卡', mapUrl: 'https://www.google.com/maps/place/Santa+Claus+Village' },
+    { time: '下午', title: 'Raindeer Path', note: '馴鹿雪橇體驗', mapUrl: 'https://www.google.com/maps/place/Santa+Claus+Reindeer' },
+    { time: '美食', title: 'Santa Salmon Place', note: '午餐首選', isFood: true, mapUrl: 'https://www.google.com/maps/place/Santa\'s+Salmon+Place' },
+    { time: '美食', title: 'HANKI 韓國菜', note: '晚餐首選', isFood: true, mapUrl: 'https://www.google.com/maps/place/HANKI' }
+  ]},
+  { date: '12/24', city: '瑞典 ➔ 羅瓦涅米', temp: '-15°/-22°', weather: '❄️', events: [
+    { time: '全天', title: '瑞典 POLAR 破冰船', note: 'KKDAY $63324', isKey: true, mapUrl: 'https://www.google.com/maps/place/Polar+Explorer+Icebreaker' },
+    { time: '晚上', title: '極光探險', note: '預約行程 $19728', isKey: true },
+    { time: '晚餐', title: 'Restaurant Taiga', note: '平安夜大餐', isFood: true, mapUrl: 'https://www.google.com/maps/place/Lappish+Restaurant+Taiga' }
+  ]},
+  { date: '12/25', city: '羅瓦涅米 ➔ 薩里賽爾卡', temp: '-18°/-25°', weather: '❄️', events: [
+    { time: '早上', title: '哈士奇雪橇', note: 'Husky Park 體驗', mapUrl: 'https://www.google.com/maps/search/Husky+Park+Rovaniemi' },
+    { time: '下午', title: '長途巴士', note: '前往薩里賽爾卡', isKey: true },
+    { time: '住宿', title: 'Northern Lights Village', note: '入住玻璃屋', isKey: true, mapUrl: 'https://www.google.com/maps/place/Northern+Lights+Village+Saariselk%C3%A4' }
+  ]},
+  { date: '12/26', city: '薩里賽爾卡 ➔ 赫爾辛基', temp: '-5°/-8°', weather: '🌤️', events: [
+    { time: '10:00', title: 'Snowmobile & Fishing', note: '冰釣與摩托車 (4hr)', isKey: true, mapUrl: 'https://www.google.com/maps/search/Ivalo+Ice+Fishing' },
+    { time: '18:35', title: 'AY606 IVL ✈ HEL', note: 'PNR: DOC79Y / DLIZ9E / 7S69AI', isKey: true, mapUrl: 'https://www.google.com/maps/place/Ivalo+Airport' },
+    { time: '住宿', title: 'Scandic Hub', note: '赫爾辛基市中心 ($4898)', mapUrl: 'https://www.google.com/maps/place/Scandic+Helsinki+Hub' }
+  ]},
+  { date: '12/27', city: '赫爾辛基', temp: '2°/-1°', weather: '🌧️', events: [
+    { time: '中午', title: 'Haru Sushi Plus', note: '日式午餐', isFood: true, mapUrl: 'https://www.google.com/maps/place/Haru+Sushi' },
+    { time: '下午', title: 'Stockmann 採買', note: 'Lumene 與退稅', mapUrl: 'https://www.google.com/maps/place/Stockmann+Helsinki+City+Centre' },
+    { time: '送機', title: 'Trip.com 送機', note: '$2621', isKey: true }
+  ]},
+  { date: '12/28', city: '赫爾辛基 ➔ 澳門', temp: '18°', weather: '☀️', events: [
+    { time: '00:50', title: 'AY099 啟程', note: '抵達時間: 19:10', isKey: true },
+    { time: '晚上', title: '包車回澳門', note: '平安到家', isKey: true }
+  ]}
+];
 
-        const MEMBERS = ["仙姑", "欣倫", "貞霓", "羽喬"];
-        const EXCHANGE_RATE = 35.5;
+const LUGGAGE_DATA = [
+  { cat: "必備穿著", items: ["極暖發熱衣x3", "羊毛襪x5", "防水雪靴", "防風大外套", "發熱褲", "毛帽/手套/圍巾"] },
+  { cat: "電子/科技", items: ["行動電源x2", "歐規轉接頭", "相機/腳架", "保濕乳液", "暖暖包x20", "個人藥品", "火車泡麵"] },
+  { cat: "重要財物", items: ["護照正副本", "保險憑證", "活動憑證QR", "信用卡(含PIN)", "歐元現金"] }
+];
 
-        const Icons = {
-            Schedule: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
-            Luggage: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="7" width="18" height="14" rx="2"></rect><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"></path></svg>,
-            Shopping: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"></path><path d="M3 6h18"></path></svg>,
-            Translate: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 8 6 6"></path><path d="m4 14 6-6 2-3"></path><path d="M2 5h12"></path></svg>,
-            Wallet: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"></path></svg>,
-            Phone: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>,
-            Check: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
-            Trash: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path></svg>,
-            CreditCard: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>,
-            Banknote: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><circle cx="12" cy="12" r="2"></circle></svg>,
-            Refresh: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>,
-        };
+const SHOPPING_DATA = [
+  { name: "Lumene", addr: "Stockmann, Sokos, 機場", note: "芬蘭護膚之冠，維他命C亮顏系列必買。" },
+  { name: "MOOMIN SHOP", addr: "Forum 2F, 萬塔機場", note: "嚕嚕米周邊商品。" },
+  { name: "Marimekko", addr: "Mikonkatu 1 (旗艦店)", note: "設計印花織品。" }
+];
 
-        const TRIP_DATA = [
-            { date: '12/20', city: '赫爾辛基', temp: '1°/-2°', weather: '☁️', events: [{ time: '17:00', title: '百路達包車出發', note: '前往機場' }] },
-            { date: '12/21', city: '赫爾辛基', temp: '0°/-3°', weather: '❄️', events: [{ time: '上午', title: '接機 ➔ 火車站', note: 'Trip.com $2800' }, { time: '景點', title: '市區一日遊', note: '教堂、聖誕市集' }] },
-            { date: '12/22', city: '羅瓦涅米', temp: '-10°/-15°', weather: '❄️', events: [{ time: '早上', title: '聖誕麥當勞', note: '領極光證書' }, { time: '全天', title: '極地動物園', note: '€514' }] },
-            { date: '12/23', city: '羅瓦涅米', temp: '-12°/-18°', weather: '🌫️', events: [{ time: '上午', title: '聖誕老人村', note: '郵局打卡' }, { time: '下午', title: '馴鹿雪橇', note: 'Santa Salmon' }] },
-            { date: '12/24', city: '瑞典/凱米', temp: '-15°/-22°', weather: '❄️', events: [{ time: '全天', title: 'POLAR 破冰船', note: 'KKDAY $63324' }] },
-            { date: '12/25', city: '薩里賽爾卡', temp: '-18°/-25°', weather: '❄️', events: [{ time: '上午', title: '哈士奇雪橇', note: '極限速度' }] },
-            { date: '12/26', city: '伊瓦洛', temp: '-5°/-8°', weather: '🌤️', events: [{ time: '10:00', title: '冰釣摩托車', note: '4小時' }] },
-            { date: '12/27', city: '赫爾辛基', temp: '2°/-1°', weather: '🌧️', events: [{ time: '下午', title: 'Lumene 採買', note: '送機 $2621' }] },
-            { date: '12/28', city: '香港/澳門', temp: '18°', weather: '☀️', events: [{ time: '全天', title: '包車回家', note: '平安到家' }] }
-        ];
+const App = () => {
+  const [activeTab, setActiveTab] = useState('schedule');
+  const [selectedDate, setSelectedDate] = useState('12/21');
+  const [user, setUser] = useState(null);
+  const [expenses, setExpenses] = useState([]);
+  const [countdown, setCountdown] = useState(0);
 
-        const LUGGAGE_GROUPS = [
-            { cat: "穿著", items: ["極暖發熱衣x3", "羊毛襪x5", "防水雪靴", "防風外套", "發熱褲", "蓋耳毛帽", "觸控手套", "墨鏡"] },
-            { cat: "科技/生活", items: ["行動電源x2", "歐規轉接頭", "相機腳架", "GoPro", "保濕乳液", "暖暖包x20"] }
-        ];
+  // --- 輔助邏輯 ---
+  const getWeekday = (dateStr) => {
+    const d = new Date(`2026-${dateStr.replace('/', '-')}`);
+    return ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+  };
 
-        const getWeekday = (dateStr) => {
-            const fullDate = dateStr.includes('-') ? dateStr : `2024-${dateStr.replace('/', '-')}`;
-            const date = new Date(fullDate);
-            const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-            return isNaN(date.getTime()) ? '' : weekdays[date.getDay()];
-        };
+  useEffect(() => {
+    const updateCountdown = () => {
+      const diff = new Date('2026-12-20T00:00:00') - new Date();
+      setCountdown(Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24))));
+    };
+    updateCountdown();
+    const t = setInterval(updateCountdown, 60000);
+    return () => clearInterval(t);
+  }, []);
 
-        const getCountdown = () => {
-            const target = new Date('2026-12-20T00:00:00');
-            const now = new Date();
-            const diff = target.getTime() - now.getTime();
-            return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-        };
+  // --- 行李清單 (單機模式) ---
+  const [luggageChecked, setLuggageChecked] = useState(() => {
+    const saved = localStorage.getItem('luggage_v2026_final');
+    return saved ? JSON.parse(saved) : {};
+  });
+  useEffect(() => localStorage.setItem('luggage_v2026_final', JSON.stringify(luggageChecked)), [luggageChecked]);
 
-        const Card = ({ children, className = "" }) => (
-            <div className={`bg-white rounded-[1.5rem] p-4 border-b-2 border-r-2 border-[#E0E5D5] shadow-sm ${className}`}>
-                {children}
+  // --- 分帳狀態 ---
+  const [newExp, setNewExp] = useState({ 
+    date: new Date().toISOString().split('T')[0], 
+    title: '', amount: '', currency: 'EUR', payer: '仙姑', split: [...MEMBERS], method: '刷卡' 
+  });
+
+  // --- 翻譯狀態 ---
+  const [transInput, setTransInput] = useState("");
+  const [transResult, setTransResult] = useState(null);
+  const [loadingTrans, setLoadingTrans] = useState(false);
+
+  // --- Firebase 同步 ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (e) { console.error(e); }
+    };
+    initAuth();
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
+    return () => unsubAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = collection(db, 'artifacts', appId, 'public', 'data', 'expenses');
+    const unsubscribe = onSnapshot(q, (s) => {
+      setExpenses(s.docs.map(d => ({id: d.id, ...d.data()})));
+    }, (err) => console.error(err));
+    return () => unsubscribe();
+  }, [user]);
+
+  const { settlement, totalTwd } = useMemo(() => {
+    const bal = {}; MEMBERS.forEach(m => bal[m] = 0);
+    let total = 0;
+    expenses.forEach(e => {
+      const val = e.currency === 'EUR' ? e.amount * EXCHANGE_RATE : e.amount;
+      total += val;
+      bal[e.payer] += val;
+      const share = val / (e.split?.length || 1);
+      (e.split || MEMBERS).forEach(m => bal[m] -= share);
+    });
+    return { settlement: bal, totalTwd: total };
+  }, [expenses]);
+
+  const handleTranslate = async () => {
+    if (!transInput.trim()) return;
+    setLoadingTrans(true);
+    try {
+      const prompt = `Translate "${transInput}" into English and Finnish. For Finnish, include the phonetic pronunciation in brackets. Format the result as JSON: {"en": "...", "fi": "..."}`;
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+      });
+      const data = await res.json();
+      setTransResult(JSON.parse(data.candidates[0].content.parts[0].text));
+    } catch (e) { alert("翻譯失敗"); }
+    setLoadingTrans(false);
+  };
+
+  const addExp = async () => {
+    if (!user) return;
+    if (!newExp.title || !newExp.amount) return;
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), {
+      ...newExp, amount: Number(newExp.amount), createdAt: Date.now()
+    });
+    setNewExp({ ...newExp, title: '', amount: '' });
+  };
+
+  // --- UI 組件 ---
+  const Card = ({ children, className = "" }) => (
+    <div className={`bg-white rounded-[1.5rem] p-4 border-b-2 border-r-2 border-[#E0E5D5] shadow-sm ${className}`}>
+      {children}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#F7F4EB] text-[#4A4543] text-[13px] pb-28">
+      {/* 標頭 */}
+      <header className="sticky top-0 z-40 bg-[#F7F4EB]/90 backdrop-blur-md px-5 py-3 border-b border-[#E0E5D5] shadow-sm flex justify-between items-start">
+        <div className="flex-1">
+          <h1 className="text-xl font-black tracking-tighter">追聖誕老公公之旅 🎅</h1>
+          <div className="mt-1 space-y-0.5 text-[10px] font-bold">
+            <p className="text-[#9A8B9B]">駐芬代表處: +358 40 545 5429</p>
+            <p className="text-[#D98E8E] font-black uppercase">緊急救援: 112</p>
+          </div>
+        </div>
+        <div className="text-right flex flex-col items-end pr-4">
+          <div className="bg-[#9A8B9B] text-white px-3 py-1 rounded-2xl shadow-sm border-b-2 border-r-2 border-black/10">
+            <span className="text-[8px] font-black block leading-none mb-1 opacity-80">Departure</span>
+            <div className="flex items-baseline gap-0.5">
+              <span className="text-lg font-black">{countdown}</span>
+              <span className="text-[9px] font-bold">DAYS</span>
             </div>
-        );
+          </div>
+          <p className="text-[8px] font-bold text-[#9A8B9B] mt-1 tracking-tighter uppercase text-center w-full">Target: 2026/12/20</p>
+        </div>
+      </header>
 
-        const App = () => {
-            const [activeTab, setActiveTab] = useState('schedule');
-            const [selectedDate, setSelectedDate] = useState('12/21');
-            const [user, setUser] = useState(null);
-            const [expenses, setExpenses] = useState([]);
-            const [countdown, setCountdown] = useState(getCountdown());
-            const [newExp, setNewExp] = useState({ date: new Date().toISOString().split('T')[0], title: '', amount: '', currency: 'EUR', payer: '仙姑', split: [...MEMBERS], method: 'card' });
+      <main className="max-w-md mx-auto p-4">
+        {/* 行程分頁 */}
+        {activeTab === 'schedule' && (
+          <div className="space-y-6">
+            <div className="flex gap-3 overflow-x-auto no-scrollbar py-2">
+              {TRIP_DATA.map(d => (
+                <button key={d.date} onClick={() => setSelectedDate(d.date)}
+                  className={`flex-shrink-0 w-[70px] h-[82px] rounded-2xl flex flex-col items-center justify-center border-2 transition-all ${selectedDate === d.date ? 'bg-[#9A8B9B] border-[#9A8B9B] text-white shadow-lg scale-105' : 'bg-white border-[#E0E5D5]'}`}>
+                  <span className="text-[9px] font-black opacity-60 uppercase mb-0.5 text-center">Dec</span>
+                  <span className="text-xl font-black leading-none">{d.date.split('/')[1]}</span>
+                  <span className="text-[10px] font-bold opacity-90 mt-1.5 border-t border-current/20 pt-1 w-10 text-center">週{getWeekday(d.date)}</span>
+                </button>
+              ))}
+            </div>
 
-            useEffect(() => {
-                if (!window.fb) return;
-                const { auth, db, appId, signInAnonymously, onAuthStateChanged, onSnapshot, collection } = window.fb;
-                signInAnonymously(auth).catch(console.error);
-                const unsubAuth = onAuthStateChanged(auth, setUser);
-                
-                let unsubExp = () => {};
-                const checkUser = setInterval(() => {
-                    if (auth.currentUser) {
-                        const q = collection(db, 'artifacts', appId, 'public', 'data', 'expenses');
-                        unsubExp = onSnapshot(q, (s) => setExpenses(s.docs.map(d => ({id: d.id, ...d.data()}))));
-                        clearInterval(checkUser);
-                    }
-                }, 500);
-
-                return () => { unsubAuth(); unsubExp(); clearInterval(checkUser); };
-            }, []);
-
-            const { settlement, totalTwd } = useMemo(() => {
-                const bal = {}; MEMBERS.forEach(m => bal[m] = 0);
-                let total = 0;
-                expenses.forEach(e => {
-                    const val = e.currency === 'EUR' ? e.amount * EXCHANGE_RATE : e.amount;
-                    total += val;
-                    bal[e.payer] += val;
-                    const share = val / (e.split?.length || 1);
-                    (e.split || MEMBERS).forEach(m => bal[m] -= share);
-                });
-                return { settlement: bal, totalTwd: total };
-            }, [expenses]);
-
-            return (
-                <div className="min-h-screen pb-24 text-[13px]">
-                    <header className="sticky top-0 z-50 bg-[#F7F4EB]/90 backdrop-blur-md px-5 py-3 border-b border-[#E0E5D5] shadow-sm">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h1 className="text-xl font-black tracking-tighter text-[#4A4543]">追聖誕老公公之旅 🎅</h1>
-                                <div className="mt-1 text-[10px] font-bold text-[#9A8B9B]">駐芬代表處: +358 40 545 5429</div>
-                            </div>
-                            <div className="text-right flex flex-col items-end pr-4">
-                                <div className="flex flex-col items-center">
-                                    <div className="bg-[#9A8B9B] text-white px-3 py-1 rounded-2xl shadow-sm border-b-2 border-r-2 border-black/10">
-                                        <span className="text-[8px] font-black opacity-80 uppercase block mb-1">Departure</span>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-lg font-black">{countdown}</span>
-                                            <span className="text-[9px] font-bold">DAYS</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-[8px] font-bold text-[#9A8B9B] mt-1 uppercase">Target: 2026/12/20</div>
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-
-                    <main className="max-w-md mx-auto p-4">
-                        {activeTab === 'schedule' && (
-                            <div className="space-y-5">
-                                <div className="flex gap-3 overflow-x-auto no-scrollbar py-2">
-                                    {TRIP_DATA.map(d => (
-                                        <button key={d.date} onClick={() => setSelectedDate(d.date)}
-                                            className={`flex-shrink-0 w-[70px] h-[82px] rounded-2xl flex flex-col items-center justify-center border-2 transition-all ${selectedDate === d.date ? 'bg-[#9A8B9B] border-[#9A8B9B] text-white shadow-lg' : 'bg-white border-[#E0E5D5]'}`}>
-                                            <span className="text-[9px] font-black opacity-60 uppercase mb-0.5">Dec</span>
-                                            <span className="text-xl font-black">{d.date.split('/')[1]}</span>
-                                            <span className="text-[10px] font-bold opacity-90 mt-1.5 border-t border-current/20 pt-1 w-10 text-center">週{getWeekday(d.date)}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                                {TRIP_DATA.filter(d => d.date === selectedDate).map(day => (
-                                    <div key={day.date} className="space-y-4">
-                                        <div className="flex justify-between items-center px-1">
-                                            <div className="text-xl font-black">{day.city}</div>
-                                            <div className="text-[10px] font-black text-[#9A8B9B] bg-white px-3 py-1.5 rounded-full border border-[#E0E5D5] shadow-sm">
-                                                {day.temp} {day.weather}
-                                            </div>
-                                        </div>
-                                        <div className="space-y-3 pl-6 border-l-2 border-[#E0E5D5] ml-2">
-                                            {day.events.map((e, i) => (
-                                                <Card key={i}>
-                                                    <span className="text-[9px] font-black text-[#9A8B9B] px-1.5 py-0.5 bg-[#9A8B9B]/10 rounded-full uppercase">{e.time}</span>
-                                                    <h3 className="font-bold text-[#4A4543] mt-1">{e.title}</h3>
-                                                    <p className="text-[11px] text-[#A8A196] mt-0.5">{e.note}</p>
-                                                </Card>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {activeTab === 'expense' && (
-                            <div className="space-y-5">
-                                <Card className="bg-[#4A4543] text-white shadow-xl">
-                                    <div className="text-[10px] font-black opacity-40 uppercase border-b border-white/10 pb-2 mb-4">結算狀況 (NTD)</div>
-                                    <div className="space-y-3">
-                                        {MEMBERS.map(m => (
-                                            <div key={m} className="flex justify-between items-center">
-                                                <span className="font-bold">{m}</span>
-                                                <span className={`font-black ${settlement[m] >= 0 ? 'text-[#8EB695]' : 'text-[#D98E8E]'}`}>
-                                                    {settlement[m] >= 0 ? `+ $${Math.round(settlement[m]).toLocaleString()}` : `- $${Math.abs(Math.round(settlement[m])).toLocaleString()}`}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Card>
-                                {/* 此處可繼續加入新增支出的表單與列表 */}
-                                <div className="text-center p-10 text-gray-400">記帳功能與雲端同步中... ❄️</div>
-                            </div>
-                        )}
-                    </main>
-
-                    <nav className="fixed bottom-6 left-5 right-5 z-50">
-                        <div className="max-w-[420px] mx-auto bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-2 flex items-center justify-around shadow-2xl border border-white/50">
-                            {[
-                                { id: 'schedule', icon: Icons.Schedule, label: '行程' },
-                                { id: 'luggage', icon: Icons.Luggage, label: '行李' },
-                                { id: 'shopping', icon: Icons.Shopping, label: '必買' },
-                                { id: 'translate', icon: Icons.Translate, label: '翻譯' },
-                                { id: 'expense', icon: Icons.Wallet, label: '分帳' },
-                            ].map(({ id, icon: Icon, label }) => (
-                                <button key={id} onClick={() => setActiveTab(id)} className={`flex flex-col items-center justify-center w-11 h-11 transition-all rounded-2xl ${activeTab === id ? 'text-[#9A8B9B] bg-[#9A8B9B]/10' : 'text-gray-300'}`}>
-                                    <Icon />
-                                    {activeTab === id && <span className="text-[9px] font-black uppercase mt-0.5">{label}</span>}
-                                </button>
-                            ))}
-                        </div>
-                    </nav>
+            {TRIP_DATA.filter(d => d.date === selectedDate).map(day => (
+              <div key={day.date} className="space-y-4 animate-in fade-in">
+                <div className="flex justify-between items-center px-1">
+                  <h2 className="text-xl font-black">{day.city}</h2>
+                  <span className="text-[11px] font-black text-[#9A8B9B] bg-white px-3 py-1.5 rounded-full border border-[#E0E5D5] shadow-sm">{day.temp} {day.weather}</span>
                 </div>
-            );
-        };
+                <div className="space-y-6 pl-6 border-l-2 border-[#E0E5D5] ml-2">
+                  {day.events.map((e, i) => (
+                    <div key={i} className="relative">
+                      <div className={`absolute -left-[29px] top-2 w-3 h-3 rounded-full border-2 border-white shadow-sm ${e.isKey ? 'bg-[#D98E8E]' : 'bg-[#9A8B9B]'}`}></div>
+                      <Card className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1 pr-2">
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase ${e.isFood ? 'bg-orange-50 text-orange-500' : 'bg-[#9A8B9B]/10 text-[#9A8B9B]'}`}>{e.time}</span>
+                            <h3 className="font-bold text-[14px] mt-1 leading-tight">{e.title}</h3>
+                          </div>
+                          {e.mapUrl && (
+                            <a href={e.mapUrl} target="_blank" rel="noreferrer" className="bg-[#E0E5D5] text-[#4A4543] px-3 py-2 rounded-xl font-black text-[10px] flex items-center gap-1 active:scale-95 transition-all shadow-sm">
+                              <Icons.Map /> 定位
+                            </a>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#A8A196] font-medium leading-relaxed whitespace-pre-wrap italic">{e.note}</p>
+                      </Card>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+        {/* 行李分頁 */}
+        {activeTab === 'luggage' && (
+          <div className="space-y-6 animate-in fade-in">
+            <h2 className="text-xl font-black px-1 text-center font-bold">個人行李清單 ❄️</h2>
+            <p className="text-[10px] text-[#9A8B9B] px-1 text-center font-bold">單機存儲，狀態僅保存在您的手機中。</p>
+            {LUGGAGE_DATA.map(group => (
+              <div key={group.cat} className="space-y-3">
+                <h3 className="text-[10px] font-black text-[#9A8B9B] uppercase tracking-widest ml-2">{group.cat}</h3>
+                <Card className="divide-y divide-gray-50 p-0 overflow-hidden">
+                  {group.items.map(item => (
+                    <div key={item} onClick={() => setLuggageChecked(prev => ({...prev, [item]: !prev[item]}))}
+                      className="flex items-center gap-3 p-4 active:bg-gray-50 cursor-pointer">
+                      <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${luggageChecked[item] ? 'bg-[#9A8B9B] border-[#9A8B9B]' : 'border-[#E0E5D5]'}`}>
+                        {luggageChecked[item] && <Icons.Check />}
+                      </div>
+                      <span className={`font-bold ${luggageChecked[item] ? 'text-gray-300 line-through font-normal' : 'text-[#4A4543]'}`}>{item}</span>
+                    </div>
+                  ))}
+                </Card>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 必買與退稅分頁 */}
+        {activeTab === 'shopping' && (
+          <div className="space-y-6 animate-in fade-in pb-12">
+            <h2 className="text-xl font-black px-1 text-center font-bold">芬蘭退稅與必買 🛍️</h2>
+            
+            {/* 詳細退稅攻略文字 */}
+            <Card className="bg-[#4A4543] text-white border-none shadow-lg mb-6 overflow-hidden">
+              <div className="bg-black/20 p-4 border-b border-white/10">
+                <h3 className="font-black text-[15px] flex items-center gap-2 uppercase tracking-wider">
+                   芬蘭退稅全攻略 (Tax Free)
+                </h3>
+              </div>
+              <div className="p-5 space-y-5">
+                <div className="space-y-2">
+                   <p className="font-black text-[13px] text-[#E0E5D5]">01. 門檻與退稅比例</p>
+                   <p className="text-[11px] leading-relaxed opacity-90">
+                    在同一店舖單日消費總額滿 <span className="text-[#D98E8E] font-black underline">€40</span> 即可辦理退稅。芬蘭一般商品稅率為 24%，食品為 14%。扣除 Global Blue 服務費後，約可實際拿回 <span className="font-black italic">10% - 13%</span> 的稅金。
+                   </p>
+                </div>
+                <div className="space-y-2 border-t border-white/10 pt-3">
+                   <p className="font-black text-[13px] text-[#E0E5D5]">02. 商店取單流程</p>
+                   <p className="text-[11px] leading-relaxed opacity-90">
+                    結帳時請主動告知店員 "Tax Free, Please"，並出示您的<span className="font-black underline decoration-2">護照正本</span>（或清晰的照片）。店員會將商品用專用膠帶密封，並附上 Global Blue 退稅單據。
+                   </p>
+                </div>
+                <div className="bg-white/10 p-4 rounded-2xl border-l-4 border-[#D98E8E]">
+                   <p className="font-black text-[12px] text-[#D98E8E] mb-1 leading-tight">⚠️ 絕對不可拆封商品！</p>
+                   <p className="text-[10px] opacity-90 leading-tight">
+                    在離開歐盟（最後一站赫爾辛基機場）前，<span className="font-black italic underline decoration-[#D98E8E]">絕對不能拆開</span>密封膠帶。海關隨機抽查時若發現商品已拆封使用，將會拒絕在稅單上蓋章，導致退稅失敗。
+                   </p>
+                </div>
+                <div className="space-y-2 border-t border-white/10 pt-3">
+                   <p className="font-black text-[13px] text-[#E0E5D5]">03. 機場辦理步驟 (HEL)</p>
+                   <p className="text-[11px] leading-relaxed opacity-90">
+                    抵達萬塔機場後，請依循 "Global Blue" 指示牌前往櫃檯。若退稅商品在「託運行李」中，需在櫃檯蓋章後再寄行李。若退稅商品在「隨身行李」中，則通過安檢後前往登機門附近的櫃檯辦理。
+                   </p>
+                </div>
+                <div className="space-y-2 border-t border-white/10 pt-3">
+                   <p className="font-black text-[13px] text-[#E0E5D5]">04. 選擇退款方式</p>
+                   <p className="text-[11px] leading-relaxed opacity-90">
+                    推薦選擇<span className="font-black">退回信用卡</span>（約 5-10 個工作天到帳，匯率較佳）。若選擇現場領取現金，每張稅單通常會加收 €3-€5 的現金提取手續費。
+                   </p>
+                </div>
+              </div>
+            </Card>
+
+            <h3 className="text-[10px] font-black text-[#9A8B9B] uppercase tracking-widest ml-2 mb-2">熱門品牌推薦</h3>
+            {SHOPPING_DATA.map(item => (
+              <Card key={item.name} className="mb-3">
+                <h4 className="font-black text-[#4A4543] mb-1">{item.name}</h4>
+                <p className="text-[10px] text-[#9A8B9B] font-bold mb-2 flex items-center gap-1 italic"><Icons.Map /> {item.addr}</p>
+                <p className="text-[11px] text-[#A8A196] leading-relaxed font-medium">{item.note}</p>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* 翻譯分頁 */}
+        {activeTab === 'translate' && (
+          <div className="space-y-6 animate-in fade-in">
+            <h2 className="text-xl font-black px-1 text-center font-bold">三語翻譯助手 🗣️</h2>
+            <Card className="space-y-4">
+              <label className="text-[10px] font-black text-[#9A8B9B] uppercase tracking-widest ml-1">輸入中文 (國語)</label>
+              <textarea 
+                className="w-full bg-[#F7F4EB]/50 p-4 rounded-2xl outline-none font-bold text-base h-32 resize-none border border-[#E0E5D5] focus:border-[#9A8B9B] transition-colors" 
+                placeholder="例如：這個多少錢？、哪裡有廁所？" 
+                value={transInput} 
+                onChange={e => setTransInput(e.target.value)} 
+              />
+              <button 
+                onClick={handleTranslate} 
+                disabled={loadingTrans} 
+                className="w-full h-14 bg-[#9A8B9B] text-white rounded-2xl font-black text-sm shadow-md active:scale-95 transition-all disabled:opacity-50"
+              >
+                {loadingTrans ? "翻譯模組啟動中..." : "翻譯為 英語 & 芬蘭語"}
+              </button>
+            </Card>
+            {transResult && (
+              <div className="space-y-4 animate-in slide-in-from-top">
+                <Card className="bg-[#E0E5D5]/30 border-none">
+                  <div className="text-[10px] font-black text-[#9A8B9B] mb-1 uppercase tracking-widest">English</div>
+                  <p className="text-base font-bold text-[#4A4543]">{transResult.en}</p>
+                </Card>
+                <Card className="bg-[#9A8B9B]/10 border-none">
+                  <div className="text-[10px] font-black text-[#9A8B9B] mb-1 uppercase tracking-widest">Finnish (Suomi)</div>
+                  <p className="text-xl font-black text-[#4A4543] mb-1">{transResult.fi}</p>
+                </Card>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 分帳分頁 (雲端同步) */}
+        {activeTab === 'expense' && (
+          <div className="space-y-6 animate-in slide-in-from-bottom pb-12">
+            <h2 className="text-xl font-black px-1 text-center font-bold">雲端同步分帳系統 💳</h2>
+            
+            <div className="space-y-5">
+              {/* 結算看板 */}
+              <div className="bg-[#4A4543] text-white p-6 rounded-[2.5rem] shadow-xl space-y-4">
+                <div className="text-[10px] font-black opacity-40 uppercase border-b border-white/10 pb-2 mb-2 text-center tracking-widest">旅程消費總額 (NTD)</div>
+                <div className="text-3xl font-black text-center py-2 tracking-tighter">NT$ {Math.round(totalTwd).toLocaleString()}</div>
+                <div className="space-y-3 pt-2">
+                  {MEMBERS.map(m => (
+                    <div key={m} className="flex justify-between items-center">
+                      <span className="font-bold text-base">{m}</span>
+                      <span className={`font-black text-sm ${settlement[m] >= 0 ? 'text-[#8EB695]' : 'text-[#D98E8E]'}`}>
+                        {settlement[m] >= 0 ? `應收回 +$${Math.round(settlement[m]).toLocaleString()}` : `應支付 -$${Math.abs(Math.round(settlement[m])).toLocaleString()}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 新增支出 - 手機適配優化 */}
+              <Card className="space-y-5">
+                <h3 className="font-black text-base px-1">新增一筆支出項目</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">日期</label>
+                    <input type="date" className="w-full h-14 px-3 rounded-2xl border border-[#E0E5D5] bg-[#F7F4EB]/30 font-bold text-base appearance-none" value={newExp.date} onChange={e => setNewExp({...newExp, date: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">項目名稱</label>
+                    <input placeholder="例如: 破冰船" className="w-full h-14 px-3 rounded-2xl border border-[#E0E5D5] bg-[#F7F4EB]/30 font-bold text-base" value={newExp.title} onChange={e => setNewExp({...newExp, title: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 items-end">
+                  <div className="flex-[2] space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1">金額與幣別</label>
+                    <div className="flex bg-[#F7F4EB]/30 rounded-2xl border border-[#E0E5D5] overflow-hidden h-14 items-center">
+                      <input type="number" placeholder="0" className="w-full px-3 bg-transparent outline-none font-bold text-lg" value={newExp.amount} onChange={e => setNewExp({...newExp, amount: e.target.value})} />
+                      <select className="bg-transparent font-black px-2 text-[12px] border-l border-[#E0E5D5] h-full" value={newExp.currency} onChange={e => setNewExp({...newExp, currency: e.target.value})}>
+                        <option value="EUR">€ (EUR)</option><option value="TWD">$ (TWD)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex-[1.5] space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase ml-1 text-center block">支付方式</label>
+                    <div className="flex rounded-2xl border border-[#E0E5D5] overflow-hidden h-14 bg-white p-1">
+                      <button onClick={() => setNewExp({...newExp, method: '刷卡'})} className={`flex-1 flex flex-col items-center justify-center rounded-xl transition-all ${newExp.method === '刷卡' ? 'bg-[#9A8B9B] text-white' : 'text-gray-300'}`}>
+                        <Icons.CreditCard /><span className="text-[8px] font-black mt-0.5">刷卡</span>
+                      </button>
+                      <button onClick={() => setNewExp({...newExp, method: '現金'})} className={`flex-1 flex flex-col items-center justify-center rounded-xl transition-all ${newExp.method === '現金' ? 'bg-[#9A8B9B] text-white' : 'text-gray-300'}`}>
+                        <Icons.Banknote /><span className="text-[8px] font-black mt-0.5">現金</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-gray-400 uppercase ml-1">由誰支付？</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {MEMBERS.map(m => (
+                      <button key={m} onClick={() => setNewExp({...newExp, payer: m})} className={`h-12 rounded-xl text-[12px] font-black border-2 transition-all ${newExp.payer === m ? 'bg-[#9A8B9B] border-[#9A8B9B] text-white shadow-md' : 'bg-white border-[#E0E5D5] text-gray-300'}`}>{m}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-gray-400 uppercase ml-1 block">誰要分攤？</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {MEMBERS.map(m => (
+                      <button key={m} onClick={() => {
+                        const up = newExp.split.includes(m) ? newExp.split.filter(x => x !== m) : [...newExp.split, m];
+                        setNewExp({...newExp, split: up});
+                      }} className={`h-12 rounded-xl text-[12px] font-black border-2 transition-all ${newExp.split.includes(m) ? 'bg-[#E0E5D5] border-[#9A8B9B] text-[#4A4543]' : 'bg-white border-[#E0E5D5] text-gray-200'}`}>{m}</button>
+                    ))}
+                  </div>
+                </div>
+                <button onClick={addExp} className="w-full h-16 bg-[#4A4543] text-white rounded-[1.5rem] font-black text-base shadow-xl active:scale-95 transition-all mt-2">儲存至雲端同步</button>
+              </Card>
+
+              {/* 歷史列表 */}
+              <div className="space-y-3 pb-8">
+                <h3 className="text-[10px] font-black text-[#9A8B9B] uppercase tracking-widest ml-2">雲端支出明細</h3>
+                {expenses.length === 0 ? (
+                  <Card className="text-center py-10 text-gray-300 italic font-bold">尚無支出紀錄 ❄️</Card>
+                ) : (
+                  expenses.sort((a,b) => b.createdAt - a.createdAt).map(exp => (
+                    <Card key={exp.id} className="flex justify-between items-center py-4 px-5">
+                      <div className="flex-1 pr-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[9px] font-black text-[#9A8B9B] bg-[#9A8B9B]/10 px-1.5 py-0.5 rounded">
+                            {exp.date.slice(5)} • {exp.payer}
+                          </span>
+                          <span className="text-[9px] font-black text-gray-400 px-1.5 py-0.5 rounded border border-gray-100 flex items-center gap-1">
+                            {exp.method === '刷卡' ? <Icons.CreditCard /> : <Icons.Banknote />}
+                            {exp.method}
+                          </span>
+                        </div>
+                        <p className="font-bold text-[13px] text-[#4A4543] leading-tight">{exp.title}</p>
+                        <p className="text-[8px] text-gray-300 font-bold mt-0.5 italic overflow-hidden text-ellipsis whitespace-nowrap">對象: {exp.split?.join(', ')}</p>
+                      </div>
+                      <div className="text-right flex items-center gap-4 shrink-0">
+                        <div>
+                          <p className="font-black text-sm">{exp.currency === 'EUR' ? '€' : '$'}{exp.amount.toLocaleString()}</p>
+                          <p className="text-[9px] text-gray-400 font-bold tracking-tighter">NT${Math.round(exp.currency==='EUR'?exp.amount*EXCHANGE_RATE:exp.amount).toLocaleString()}</p>
+                        </div>
+                        <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', exp.id))} className="text-red-200 active:text-red-500 p-1"><Icons.Trash /></button>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* 導航 */}
+      <nav className="fixed bottom-6 left-5 right-5 z-40">
+        <div className="max-w-[420px] mx-auto bg-white/95 backdrop-blur-xl rounded-[2.5rem] p-2 flex items-center justify-around shadow-2xl border border-white/50">
+          {[
+            { id: 'schedule', icon: Icons.Schedule, label: '行程' },
+            { id: 'luggage', icon: Icons.Luggage, label: '行李' },
+            { id: 'shopping', icon: Icons.Shopping, label: '必買' },
+            { id: 'translate', icon: Icons.Translate, label: '翻譯' },
+            { id: 'expense', icon: Icons.Wallet, label: '分帳' },
+          ].map(({ id, icon: Icon, label }) => (
+            <button key={id} onClick={() => setActiveTab(id)} className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all ${activeTab === id ? 'text-[#9A8B9B] bg-[#9A8B9B]/10 scale-105 shadow-sm' : 'text-gray-300'}`}>
+              <Icon />
+              {activeTab === id && <span className="text-[8px] font-black uppercase mt-1 leading-none tracking-tighter">{label}</span>}
+            </button>
+          ))}
+        </div>
+      </nav>
+    </div>
+  );
+};
+
+export default App;
 
 ```
