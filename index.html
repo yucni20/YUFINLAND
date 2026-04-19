@@ -64,33 +64,37 @@
         const TRIP_DATA = [
             { date: '12/20', city: '香港 ➔ 赫爾辛基', temp: '1°/-2°', weather: '☁️', events: [
                 { time: '17:00', title: '百路達包車', note: '出發前往香港機場', isKey: true, mapUrl: 'https://www.google.com/maps/search/Hong+Kong+International+Airport' },
-                { time: '21:45', title: 'AY100 啟程 (HKG✈HEL)', note: 'Flight: AY100 | Duration: 14hr\nPNR: E748Q2 / EYKWRZ / 9I256Q', isKey: true }
+                { time: '21:45', title: 'AY100 啟程 (HKG✈HEL)', note: 'Flight: AY100 | Duration: 12/20 21:45 - 12/21 05：45（14hr）\nPNR: E748Q2 / EYKWRZ / 9I256Q', isKey: true }
             ]},
             { date: '12/21', city: '赫爾辛基', temp: '0°/-3°', weather: '❄️', events: [
                 { time: '05:45', title: '抵達萬塔機場 (HEL)', note: 'Trip.com 接機 ($2800) ➔ 赫爾辛基火車站', mapUrl: 'https://www.google.com/maps/search/Helsinki+Airport' },
                 { time: '上午', title: '火車站寄存行李', note: 'Helsinki Central Station', mapUrl: 'https://www.google.com/maps/search/Helsinki+Central+Station+Luggage+Storage' },
                 { time: '景點', title: '赫爾辛基主座教堂', note: '參議院廣場耶誕市集', mapUrl: 'https://www.google.com/maps/place/Helsinki+Cathedral' },
-                { time: '景點', title: '芬蘭堡 & 老農貿市場', note: 'OLD MARKET HALL 採購', mapUrl: 'https://www.google.com/maps/place/Old+Market+Hall' },
+                { time: '景點', title: '老農貿市場', note: 'OLD MARKET HALL 採購', mapUrl: 'https://www.google.com/maps/place/Old+Market+Hall' },
                 { time: '美食', title: 'Kappeli 鮭魚湯', note: 'Breakfast: Friends & Brgrs\nLunch: Kappeli', isFood: true, mapUrl: 'https://www.google.com/maps/place/Kappeli' },
                 { time: '購物', title: 'MOOMIN SHOP', note: '嚕嚕米馬克杯與周邊', mapUrl: 'https://www.google.com/maps/search/MOOMIN+SHOP+Helsinki' },
+                { time: '景點', title: '芬蘭堡', note: 'SUOMENLINNA', mapUrl: 'https://maps.app.goo.gl/kkFsNHbgaDmvhy5M8?g_st=ic' },       
                 { time: '19:29', title: 'VR 北極特快車', note: '夜宿火車前往羅瓦涅米\nDinner: 火車泡麵', isKey: true }
             ]},
             { date: '12/22', city: '羅瓦涅米', temp: '-10°/-15°', weather: '❄️', events: [
-                { time: '07:20', title: '抵達羅瓦涅米', note: '打卡聖誕官方麥當勞 (領極光證書)', mapUrl: 'https://www.google.com/maps/place/McDonald\'s+Rovaniemi' },
-                { time: '早上', title: '北極野生動物園', note: 'Ranua Zoo €514 ($18900)\n官網預訂 (2大1小)', mapUrl: 'https://www.google.com/maps/place/Ranua+Zoo' },
-                { time: '下午', title: 'K-Market 超市採買', note: '補給 BEARHEART 民宿物資', mapUrl: 'https://www.google.com/maps/search/K-Market+Rovaniemi' },
-                { time: '晚上', title: '追極光行程', note: '預約專車 €580 (宿: BEARHEART)', isKey: true }
+                { time: '07:20', title: '抵達羅瓦涅米', note: '辛苦了', isKey: true },
+                { time: '早餐', title: '羅瓦涅米麥當勞🍔', note: '早餐推薦', isFood: true,mapUrl: 'https://www.google.com/maps/place/McDonald\'s+Rovaniemi'  },
+                { time: '早上', title: '北極野生動物園', note: 'Ranua Zoo €514 ($18900)\（2大1小官網75歐+24.5歐-不含接送)', mapUrl: 'https://www.google.com/maps/place/Ranua+Zoo' },
+                { time: '下午', title: 'K-Market 超市採買', note: 'SHOPPING', mapUrl: 'https://www.google.com/maps/search/K-Market+Rovaniemi' }
+                { time: '晚上', title: '追極光行程', note: 'Beyond Arctic Ltd 145歐/人', isKey: true }
+                { time: '住宿', title: 'BEARHEART', note: '民宿費用：TWD55502.21（已支付）', mapUrl: 'https://maps.app.goo.gl/STBQnsAbNV2grK5v9?g_st=ic' }
             ]},
             { date: '12/23', city: '羅瓦涅米', temp: '-12°/-18°', weather: '🌫️', events: [
                 { time: '上午', title: '聖誕老人村', note: '辦公室、郵局、北極圈打卡', mapUrl: 'https://www.google.com/maps/place/Santa+Claus+Village' },
                 { time: '下午', title: 'Raindeer Path', note: '馴鹿雪橇體驗', mapUrl: 'https://www.google.com/maps/place/Santa+Claus+Reindeer' },
-                { time: '美食', title: 'Santa Salmon Place', note: '午餐推薦', isFood: true, mapUrl: 'https://www.google.com/maps/place/Santa\'s+Salmon+Place' },
-                { time: '美食', title: 'HANKI 韓國菜', note: '晚餐推薦', isFood: true, mapUrl: 'https://www.google.com/maps/place/HANKI' }
+                { time: '午餐', title: 'Santa Salmon Place', note: '11：00營業', isFood: true, mapUrl: 'https://www.google.com/maps/place/Santa\'s+Salmon+Place' },
+                { time: '晚餐', title: 'HANKI 韓國菜', note: '晚餐推薦', isFood: true, mapUrl: 'https://www.google.com/maps/place/HANKI' }
+                { time: '住宿', title: 'BEARHEART', note: '民宿費用：TWD55502.21（已支付）', mapUrl: 'https://maps.app.goo.gl/STBQnsAbNV2grK5v9?g_st=ic' }
             ]},
-            { date: '12/24', city: '瑞典 ➔ 羅瓦涅米', temp: '-15°/-22°', weather: '❄️', events: [
-                { time: '全天', title: '瑞典 POLAR 破冰船', note: 'KKDAY $63324\n大人€180 / 小孩€155', isKey: true, mapUrl: 'https://www.google.com/maps/place/Polar+Explorer+Icebreaker' },
-                { time: '晚上', title: '極光專車', note: '報名極光行程 $19728', isKey: true },
-                { time: '美食', title: 'Lappish Taiga', note: '晚餐: Taiga 餐廳', isFood: true, mapUrl: 'https://www.google.com/maps/place/Lappish+Restaurant+Taiga' }
+            { date: '12/24', city: '羅瓦涅米 ➔ 瑞典', temp: '-15°/-22°', weather: '❄️', events: [
+                { time: '全天', title: '瑞典 POLAR 破冰船', note: '羅瓦涅米上下車：300歐', isKey: true, mapUrl: 'https://www.google.com/maps/place/Polar+Explorer+Icebreaker' },
+                { time: '晚餐', title: 'Lappish Restaurant Taiga', note: '高級餐廳', isFood: true, mapUrl: 'https://www.google.com/maps/place/Lappish+Restaurant+Taiga' }
+                { time: '住宿', title: 'BEARHEART', note: '民宿費用：TWD55502.21（已支付）', mapUrl: 'https://maps.app.goo.gl/STBQnsAbNV2grK5v9?g_st=ic' }
             ]},
             { date: '12/25', city: '羅瓦涅米 ➔ 薩里賽爾卡', temp: '-18°/-25°', weather: '❄️', events: [
                 { time: '早上', title: '哈士奇雪橇', note: 'Husky Park 狂奔', mapUrl: 'https://www.google.com/maps/search/Husky+Park+Rovaniemi' },
@@ -100,12 +104,13 @@
             { date: '12/26', city: '薩里賽爾卡 ➔ 赫爾辛基', temp: '-5°/-8°', weather: '🌤️', events: [
                 { time: '10:00', title: 'Snowmobile & Ice Fishing', note: '4小時冰釣摩托車體驗', isKey: true, mapUrl: 'https://www.google.com/maps/search/Ivalo+Ice+Fishing' },
                 { time: '18:35', title: 'AY606 IVL✈HEL', note: '18:35-20:05\nPNR: DOC79Y / DLIZ9E / 7S69AI', isKey: true },
+                { time: '20:05', title: '抵達萬塔機場 (HEL)', note: 'Trip.com 接機 ($2621) ➔ Scandic Helsinki Hub', mapUrl: 'https://www.google.com/maps/search/Helsinki+Airport' },
                 { time: '住宿', title: 'Scandic Hub', note: '赫爾辛基市中心飯店 ($4898)', mapUrl: 'https://www.google.com/maps/place/Scandic+Helsinki+Hub' }
             ]},
             { date: '12/27', city: '赫爾辛基', temp: '2°/-1°', weather: '🌧️', events: [
-                { time: '中午', title: 'Haru Sushi Plus', note: '最後壽司衝刺', isFood: true, mapUrl: 'https://www.google.com/maps/place/Haru+Sushi' },
-                { time: '購物', title: 'Stockmann 採買', note: '芬蘭國寶 Lumene & 退稅', mapUrl: 'https://www.google.com/maps/place/Stockmann+Helsinki+City+Centre' },
-                { time: '下午', title: 'Trip.com 送機', note: '最後衝刺萬塔機場 ($2621)', isKey: true }
+                { time: '午餐', title: 'Haru Sushi Plus', note: '壽司自助餐', isFood: true, mapUrl: 'https://www.google.com/maps/place/Haru+Sushi' },
+                { time: '購物', title: 'Stockmann 百貨', note: '09：00營業 & 退稅櫃檯在六樓', mapUrl: 'https://www.google.com/maps/place/Stockmann+Helsinki+City+Centre' },
+                { time: '20：00', title: 'Trip.com 送機', note: '出發去機場 ($2621)', isKey: true }
             ]},
             { date: '12/28', city: '赫爾辛基 ➔ 澳門', temp: '18°', weather: '☀️', events: [
                 { time: '00:50', title: 'AY099 啟程 (HEL✈HKG)', note: 'Departs: 00:50 | Arrives: 19:10', isKey: true },
@@ -114,9 +119,10 @@
         ];
 
         const LUGGAGE_GROUPS = [
-            { cat: "必備穿著", items: ["極暖發熱衣x3", "羊毛襪x5", "防水雪靴", "防風大外套", "發熱褲", "蓋耳毛帽", "滑雪手套", "圍巾"] },
-            { cat: "電子/科技", items: ["行動電源x2", "歐規轉接頭", "相機/腳架", "保濕乳液", "暖暖包x20", "個人藥品", "火車泡麵"] },
-            { cat: "重要財物", items: ["護照正副本", "保險憑證", "活動憑證QR", "信用卡(含PIN)", "歐元現金"] }
+            { cat: "必備穿著", items: ["極暖發熱衣x3", "機上拖鞋x2",  "羊毛襪x5", "防水雪靴", "羽絨外套", "毛衣x2", "fleece/羽絨背心", "耳罩", "發熱褲x3", "毛帽x2", "手套", "圍巾x2"] },
+            { cat: "3C", items: ["行動電源x2", "歐規轉接頭", "相機/腳架", "保濕乳液", "暖暖包x20"] },
+            { cat: "個人物品", items: [ "保濕乳液" ,"個人藥品", "暖暖包x20"] }, 
+            { cat: "重要財物", items: ["護照正副本", "保險憑證", "住宿證明", "信用卡", "證件照", "歐元現金"] }
         ];
 
         const SHOPPING_DATA = [
@@ -356,7 +362,7 @@
 
                         {activeTab === 'expense' && (
                             <div className="space-y-6 pb-12">
-                                <h2 className="text-xl font-black px-1 text-center font-bold">雲端分帳系統 💳</h2>
+                                <h2 className="text-xl font-black px-1 text-center font-bold">記帳系統 💳</h2>
                                 <div className="bg-[#4A4543] text-white p-6 rounded-[2.5rem] shadow-xl space-y-4">
                                     <div className="text-[10px] font-black opacity-40 uppercase border-b border-white/10 pb-2 mb-2 text-center tracking-widest">旅程消費總額 (NTD)</div>
                                     <div className="text-3xl font-black text-center py-2 tracking-tighter">NT$ {Math.round(totalTwd).toLocaleString()}</div>
